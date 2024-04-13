@@ -15,9 +15,8 @@ async def add():
             `shards: list of shard names to copy`
 
     `Response payload:`
-        `message:`
-            `replicas: list of replica servers`
-        `status: status of the request`
+        `message: Servers added successfully`
+        `status: Success`
 
     `Error payload:`
         `message: error message`
@@ -43,17 +42,41 @@ async def add():
 
         # Spawn new containers
         semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
-        
+
         async with Docker() as docker:
             tasks = [asyncio.create_task(
                 spawn_container(
                     docker,
                     serv_config['id'],
                     server,
-                    semaphore
+                    semaphore,
                 )
             ) for server, serv_config in servers.items()]
+
+            # Wait for all tasks to complete
+            await asyncio.gather(*tasks, return_exceptions=True)
         # END async with Docker() as docker
+
+        await asyncio.sleep(0)
+
+        # Copy shards to the new containers
+        semaphore = asyncio.Semaphore(REQUEST_BATCH_SIZE)
+
+        tasks = [asyncio.create_task(
+            copy_shards_to_container(
+                 server,
+                 serv_config['shards'],
+                 semaphore,
+                 )
+        ) for server, serv_config in servers.items()]
+
+        # Wait for all tasks to complete
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+        return jsonify(ic({
+            'message': 'Servers added successfully',
+            'status': 'success'
+        })), 200
 
     except Exception as e:
         return jsonify(ic(err_payload(e))), 400

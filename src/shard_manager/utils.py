@@ -52,3 +52,13 @@ def get_request_id():
 
     return random.randint(100000, 999999)
 # END get_request_id
+
+
+async def get_primary_server(shard: str):
+    """
+    Get the primary server for the shard.
+    """
+
+    # TODO: Implement this function
+
+    return "primary_server"

@@ -71,8 +71,6 @@ async def copy_shards_to_container(
     if servers_flatlined is None:
         servers_flatlined = []
 
-    global shard_map
-
     # Allow other tasks to run
     await asyncio.sleep(0)
 
@@ -156,16 +154,10 @@ async def copy_shards_to_container(
                 ''')
 
             for shard in shards:
-                if len(shard_map[shard]) == 0:
-                    continue
-
                 # Get server A from `shard_map` for the shard K
                 # TODO: Chage to ConsistentHashMap
 
-                server = shard_map[shard].find(get_request_id())
-                if len(servers_flatlined) > 0:
-                    while server in servers_flatlined:
-                        server = shard_map[shard].find(get_request_id())
+                server = await get_primary_server(shard)
 
                 shard_valid_at: int = await stmt.fetchval(shard)
 

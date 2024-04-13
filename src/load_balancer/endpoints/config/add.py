@@ -1,7 +1,6 @@
 from quart import Blueprint, jsonify, request
 
 from utils import *
-from endpoints.config.add_helper import *
 
 blueprint = Blueprint('add', __name__)
 
@@ -133,58 +132,47 @@ async def add():
             # END for shard in new_shards
 
             # Spawn new containers
-            semaphore = asyncio.Semaphore(DOCKER_TASK_BATCH_SIZE)
-
-            async with Docker() as docker:
-                # Define tasks
-                tasks = []
-
-                # Add the hostnames to the list
-                for hostname in hostnames:
-                    # get new server id
-                    serv_id = get_new_server_id()
-                    serv_ids[hostname] = serv_id
-
-                    # Add the hostname to the replicas list
-                    replicas.add(hostname, serv_id)
-
-                    # Edit the flatline map
-                    heartbeat_fail_count[hostname] = 0
-
-                    tasks.append(
-                        asyncio.create_task(
-                            spawn_container(
-                                docker,
-                                serv_id,
-                                hostname,
-                                semaphore
-                            )
-                        )
-                    )
-                # END for hostname in hostnames
-
-                # Wait for all tasks to complete
-                await asyncio.gather(*tasks, return_exceptions=True)
-            # END async with Docker
-
-            ic(serv_ids)
-
-            await asyncio.sleep(0)
-
-            # Copy shards to the new containers
             semaphore = asyncio.Semaphore(REQUEST_BATCH_SIZE)
 
-            # Define tasks
-            tasks = [asyncio.create_task(
-                copy_shards_to_container(
-                    hostname,
-                    servers[hostname],
-                    semaphore
-                )
-            ) for hostname in hostnames]
+            async def post_add_sm(
+                session: aiohttp.ClientSession,
+                payload: Dict,
+            ):
+                await asyncio.sleep(0)
 
-            # Wait for all tasks to complete
-            await asyncio.gather(*tasks, return_exceptions=True)
+                async with semaphore:
+                    async with session.post(f'http://Shard-Manager:5000/add',
+                                            json=payload) as response:
+                        await response.read()
+
+                return response
+            # END post_add_sm
+
+            # Define tasks
+            payload = {}
+
+            # Add the hostnames to the list
+            for hostname in hostnames:
+                # get new server id
+                serv_id = get_new_server_id()
+                serv_ids[hostname] = serv_id
+
+                # Add the hostname to the replicas list
+                replicas.add(hostname, serv_id)
+
+                # Edit the flatline map
+                heartbeat_fail_count[hostname] = 0
+
+                payload[hostname] = {
+                    'id': serv_id,
+                    'shards': [shard for shard in servers[hostname] if shard not in new_shard_ids]
+                }
+            # END for hostname in hostnames
+
+            async with aiohttp.ClientSession() as session:
+                await post_add_sm(session, payload)
+
+            await asyncio.sleep(0)
 
             # Update the shard_map with the new replicas
             for hostname in hostnames:
