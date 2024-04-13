@@ -35,7 +35,7 @@ async def add():
         Return an error message.
 
     `Request payload:`
-        `n: number of servers to add`
+        `N: number of servers to add`
         `new_shards: list of new shard names and description to add [optional]`
             `stud_id_low: lower bound of student id`
             `shard_id: name of the shard`
@@ -230,7 +230,6 @@ async def add():
         })), 200
 
     except Exception as e:
-
         return jsonify(ic(err_payload(e))), 400
     # END try-except
 # END add

@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 import aiohttp
 import asyncpg
-from aiodocker import Docker
 from colorama import Fore, Style
 from fifolock import FifoLock
 from icecream import ic
